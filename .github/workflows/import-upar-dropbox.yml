@@ -1,0 +1,93 @@
+name: Import full UPAR Dropbox archive (Git LFS)
+
+on:
+  workflow_dispatch:
+    inputs:
+      dropbox_shared_folder_url:
+        description: 'Publicly downloadable Dropbox folder link (from README)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+          lfs: false
+      - name: Install utilities and configure Git LFS
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq git-lfs unzip
+          git lfs install --local
+          git lfs track '*.pt' '*.ts' '*.zip'
+      - name: Download shared research folder on GitHub runner
+        env:
+          SOURCE_URL: ${{ inputs.dropbox_shared_folder_url }}
+        run: |
+          python3 - <<'PY'
+          import os, urllib.parse
+          url=os.environ["SOURCE_URL"].strip()
+          p=urllib.parse.urlparse(url)
+          if p.scheme != "https" or p.hostname not in ("www.dropbox.com", "dropbox.com"):
+              raise SystemExit("Expected an https Dropbox shared-folder link. Do not supply personal /home URLs.")
+          q=urllib.parse.parse_qs(p.query)
+          q.pop("dl", None)
+          q["dl"]=["1"]
+          out=urllib.parse.urlunparse(p._replace(query=urllib.parse.urlencode(q,doseq=True)))
+          with open(os.environ["GITHUB_ENV"],"a") as f: f.write("DOWNLOAD_URL="+out+"\n")
+          PY
+          curl --fail --location --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 3600 -A 'Mozilla/5.0' "$DOWNLOAD_URL" -o /tmp/upar.zip
+          unzip -t /tmp/upar.zip | tail -3
+      - name: Copy entire Dropbox folder contents into repository
+        run: |
+          mkdir -p /tmp/upar_data
+          unzip -q /tmp/upar.zip -d /tmp/upar_data
+          python3 - <<'PY'
+          from pathlib import Path
+          import shutil
+          root=Path("/tmp/upar_data")
+          children=[p for p in root.iterdir() if p.name not in ("__MACOSX",)]
+          if len(children)==1 and children[0].is_dir() and children[0].name=="UPAR_2027_COMPLETE_RESEARCH_AND_ENSEMBLE":
+              root=children[0]
+          known={"Models","Source_Code","Training_Notebooks","Project_Report.pdf"}
+          present={p.name for p in root.iterdir()}
+          if not {"Models","Source_Code","Training_Notebooks"}.issubset(present):
+              raise SystemExit(f"Incorrect archive root; found: {sorted(present)}")
+          count=0
+          for p in root.rglob("*"):
+              if not p.is_file() or any(part in (".git","__MACOSX") for part in p.parts):
+                  continue
+              dest=Path.cwd()/p.relative_to(root)
+              dest.parent.mkdir(parents=True,exist_ok=True)
+              shutil.copy2(p,dest)
+              count+=1
+          print(f"Copied {count} files")
+          if count<20: raise SystemExit("Unexpectedly small archive; refusing to commit.")
+          PY
+      - name: Check checkpoints and stage files
+        run: |
+          test -s Models/ResNet50_Baseline/best_dev.pt
+          test -s Models/ConvNeXt_Tiny_Baseline/best_dev.pt
+          test -s Models/ConvNeXt_Tiny_Hybrid/best_dev.pt
+          for f in v3_image.ts v3_query.ts hybrid_image.ts hybrid_query.ts; do
+            test -s "Models/Final_65_35_Ensemble/assets/$f"
+          done
+          git add --all
+          git lfs ls-files
+          git status --short
+      - name: Commit and push to main
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --staged --quiet; then
+            echo "No changes found."
+            exit 0
+          fi
+          git commit -m "Import complete UPAR research archive and model assets via Git LFS"
+          git push origin HEAD:main
