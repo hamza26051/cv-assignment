@@ -8,6 +8,8 @@
 
 <!-- Add your demo video link here. -->
 
+[**Demo Presentation (PowerPoint)**](./UPAR_Track2_Professional_Demo_Presentation.pptx)
+
 ## Project Overview
 
 This repository documents our UPAR Challenge 2027 Track 2 project: retrieving pedestrian gallery images from a **40-dimensional binary attribute query**. The query represents visible attributes (age group, upper/lower-body clothing colors, accessories, etc.), not an input photograph. The model assigns distances and ranks all gallery images. Ground-truth retrieval relevance is based on complete attribute patterns.
