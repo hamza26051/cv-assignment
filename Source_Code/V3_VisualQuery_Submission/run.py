@@ -116,4 +116,3 @@ def rank_gallery(sample):
     if distances.shape!=(len(q),len(gallery)):
         raise ValueError('Wrong QxG output shape')
     return {'distances':distances}
-

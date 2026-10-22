@@ -1,3 +1,2 @@
 # Organizer-compatible code submission marker. Ingestion imports run.py.
 command: python3 -c "print('Submission package ready. The ingestion program imports run.py')"
-

@@ -75,4 +75,3 @@ def rank_gallery(sample: dict[str,Any]) -> dict[str,Any]:
         d=a*d+(1-a)*ed
     # Official sample contract: smaller distance = better.
     return {"distances":d.astype(np.float32)}
-

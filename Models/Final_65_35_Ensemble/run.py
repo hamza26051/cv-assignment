@@ -122,4 +122,3 @@ def rank_gallery(sample: dict[str, Any]) -> dict[str, np.ndarray]:
     hq_z = hq(q_t).detach().cpu().numpy().astype(np.float32)
     distances = _score_from_vectors(q,v_logits,v_z,h_probs,h_z,vq_z,hq_z)
     return {'distances': distances}
-
